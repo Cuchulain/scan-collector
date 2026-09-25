@@ -1,0 +1,9 @@
+services:
+  isbn-collector:
+    image: ${IMAGE:-isbn-collector:latest}
+    build: .
+    ports:
+      - "${PORT:-8765}:8765"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
