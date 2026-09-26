@@ -4,6 +4,8 @@ Small HTTP server primarily intended as a backend for the Android app [Binary Ey
 
 Open `http://localhost:8765/` to view saved daily sets and their record counts. Each set has a detail page with per-record and bulk copy buttons, plus a CSV download.
 
+The interface is available in Czech and English. It follows the browser's preferred language by default (Czech for Czech browser settings, English otherwise). Use the flag button to switch languages; the choice is remembered in that browser.
+
 ## Run locally
 
 Copy `.env.example` to `.env` next to `compose.yaml`, then set a username and a long, unique password:
@@ -33,6 +35,22 @@ curl -X POST http://localhost:8765/ \
 ```
 
 Set `PORT` to change the host port. The container writes inside `/data`, mapped to `./data` by Compose. CSV columns are `čas,obsah,formát,zařízení`.
+
+## Run locally without Docker
+
+Install Go 1.25 or newer. Copy the example environment file, set your credentials, then load it into the current shell and run the server directly:
+
+```sh
+cp .env.example .env
+# Edit .env and set AUTH_USER and AUTH_PASSWORD.
+set -a
+. ./.env
+set +a
+export DATA_DIR=./data
+go run .
+```
+
+The app listens on `http://localhost:8765/` by default. The `./data` directory will contain the daily CSV files and `sessions.sqlite3`. To change the port or session durations, set `PORT`, `SESSION_TTL`, or `SESSION_EXTENDED_TTL` in `.env` before loading it. Set `COOKIE_SECURE=false` for local HTTP.
 
 ## Pull the published image
 

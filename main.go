@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	_ "embed"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -18,6 +19,9 @@ import (
 )
 
 const maxRequestBytes = 1 << 20
+
+//go:embed i18n.js
+var languageScript []byte
 
 type entry struct {
 	Timestamp string `json:"timestamp"`
@@ -54,16 +58,17 @@ var pages = template.Must(template.New("pages").Parse(`<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{if .Date}}Záznamy {{.Date}}{{else}}Scan Collector{{end}}</title>
+  <title data-i18n-page="{{if .Date}}records{{else}}dashboard{{end}}" data-date="{{.Date}}">{{if .Date}}Záznamy {{.Date}}{{else}}Scan Collector{{end}}</title>
   <style>
     :root { color-scheme: light; font: 16px/1.5 system-ui, sans-serif; color: #17212b; background: #f3f6f8; }
     body { margin: 0; }
     main { max-width: 1000px; margin: 0 auto; padding: 32px 20px 64px; }
     h1 { margin: 0 0 8px; font-size: clamp(1.7rem, 4vw, 2.4rem); }
     .muted { color: #5e6b75; margin: 0 0 24px; }
-    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; align-items: center; }
     a.button, button { display: inline-block; border: 0; border-radius: 7px; padding: 9px 14px; background: #155eef; color: white; font: inherit; text-decoration: none; cursor: pointer; }
     a.secondary, button.secondary { background: #e3eaf0; color: #17212b; }
+    button.language-switch { width: auto; }
     table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px #17212b12; }
     th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid #e5eaee; }
     th { background: #eaf0f5; font-size: .9rem; }
@@ -76,38 +81,51 @@ var pages = template.Must(template.New("pages").Parse(`<!doctype html>
   </style>
 </head>
 <body><main>
-  <div class="toolbar"><form action="/logout" method="post"><button class="secondary" type="submit">Odhlásit</button></form></div>
+  <div class="toolbar"><button class="secondary language-switch" type="button" data-language-switch>🇨🇿 Čeština</button><form action="/logout" method="post"><button class="secondary" type="submit" data-i18n="logout">Odhlásit</button></form></div>
 {{if .Date}}
-  <h1>Záznamy z {{.Date}}</h1>
-  <p class="muted">Celkem {{.Total}} {{if eq .Total 1}}záznam{{else}}záznamů{{end}}</p>
+  <h1 data-i18n="recordsTitle" data-date="{{.Date}}">Záznamy z {{.Date}}</h1>
+  <p class="muted" data-i18n="recordCount" data-count="{{.Total}}">Celkem {{.Total}} {{if eq .Total 1}}záznam{{else}}záznamů{{end}}</p>
   <div class="toolbar">
-    <a class="button secondary" href="/">← Přehled sad</a>
-    <a class="button" href="/sets/{{.Date}}.csv">Stáhnout CSV</a>
-    <button class="secondary" type="button" onclick="copyAll()">Kopírovat všechen obsah</button>
+    <a class="button secondary" href="/" data-i18n="backToSets">← Přehled sad</a>
+    <a class="button" href="/sets/{{.Date}}.csv" data-i18n="downloadCSV">Stáhnout CSV</a>
+    <button class="secondary" type="button" onclick="copyAll()" data-i18n="copyAll">Kopírovat všechen obsah</button>
     <span id="notice" role="status" aria-live="polite"></span>
   </div>
   {{if .Entries}}
-  <table id="records"><thead><tr><th>Čas</th><th>Obsah</th><th class="wide">Formát</th><th class="wide">Zařízení</th><th></th></tr></thead><tbody>
-  {{range .Entries}}<tr><td>{{index . 0}}</td><td>{{index . 1}}</td><td class="wide">{{index . 2}}</td><td class="wide">{{index . 3}}</td><td><button class="copy" type="button" data-content="{{index . 1}}" onclick="copyText(this.dataset.content)">Kopírovat</button></td></tr>{{end}}
+  <table id="records"><thead><tr><th data-i18n="time">Čas</th><th data-i18n="content">Obsah</th><th class="wide" data-i18n="format">Formát</th><th class="wide" data-i18n="device">Zařízení</th><th></th></tr></thead><tbody>
+  {{range .Entries}}<tr><td>{{index . 0}}</td><td>{{index . 1}}</td><td class="wide">{{index . 2}}</td><td class="wide">{{index . 3}}</td><td><button class="copy" type="button" data-content="{{index . 1}}" onclick="copyText(this.dataset.content)" data-i18n="copy">Kopírovat</button></td></tr>{{end}}
   </tbody></table>
-  {{else}}<p class="empty">Tato sada zatím neobsahuje žádné záznamy.</p>{{end}}
+  {{else}}<p class="empty" data-i18n="emptyRecords">Tato sada zatím neobsahuje žádné záznamy.</p>{{end}}
+  <script src="/i18n.js" defer></script>
   <script>
-    async function copyText(value) { try { await navigator.clipboard.writeText(value); document.getElementById('notice').textContent = 'Zkopírováno'; setTimeout(() => document.getElementById('notice').textContent = '', 1800); } catch (_) { document.getElementById('notice').textContent = 'Kopírování není v tomto prohlížeči dostupné'; } }
-    async function copyAll() { const values = [...document.querySelectorAll('#records tbody tr td:nth-child(2)')].map(cell => cell.textContent); try { await navigator.clipboard.writeText(values.join('\n')); document.getElementById('notice').textContent = 'Obsah zkopírován'; setTimeout(() => document.getElementById('notice').textContent = '', 1800); } catch (_) { document.getElementById('notice').textContent = 'Kopírování není v tomto prohlížeči dostupné'; } }
+    async function copyText(value) { try { await navigator.clipboard.writeText(value); document.getElementById('notice').textContent = window.scanCollectorI18n.t('copied'); setTimeout(() => document.getElementById('notice').textContent = '', 1800); } catch (_) { document.getElementById('notice').textContent = window.scanCollectorI18n.t('clipboardUnavailable'); } }
+    async function copyAll() { const values = [...document.querySelectorAll('#records tbody tr td:nth-child(2)')].map(cell => cell.textContent); try { await navigator.clipboard.writeText(values.join('\n')); document.getElementById('notice').textContent = window.scanCollectorI18n.t('contentCopied'); setTimeout(() => document.getElementById('notice').textContent = '', 1800); } catch (_) { document.getElementById('notice').textContent = window.scanCollectorI18n.t('clipboardUnavailable'); } }
   </script>
 {{else}}
-  <h1>Scan Collector</h1>
-  <p class="muted">Přehled uložených sad podle data</p>
+  <h1 data-i18n="appName">Scan Collector</h1>
+  <p class="muted" data-i18n="setsIntro">Přehled uložených sad podle data</p>
   {{if .Sets}}
-  <table><thead><tr><th>Datum</th><th>Počet záznamů</th><th></th></tr></thead><tbody>
-  {{range .Sets}}<tr><td>{{.Date}}</td><td class="count">{{.Count}}</td><td><a href="/sets/{{.Date}}">Zobrazit záznamy →</a></td></tr>{{end}}
+  <table><thead><tr><th data-i18n="date">Datum</th><th data-i18n="recordCountHeader">Počet záznamů</th><th></th></tr></thead><tbody>
+  {{range .Sets}}<tr><td>{{.Date}}</td><td class="count">{{.Count}}</td><td><a href="/sets/{{.Date}}" data-i18n="viewRecords">Zobrazit záznamy →</a></td></tr>{{end}}
   </tbody></table>
-  {{else}}<p class="empty">Zatím nejsou uložené žádné sady.</p>{{end}}
+  {{else}}<p class="empty" data-i18n="emptySets">Zatím nejsou uložené žádné sady.</p>{{end}}
+  <script src="/i18n.js" defer></script>
 {{end}}
 </main></body></html>`))
 
 func (r *receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
+	if req.URL.Path == "/i18n.js" {
+		if req.Method != http.MethodGet {
+			w.Header().Set("Allow", http.MethodGet)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+		_, _ = w.Write(languageScript)
+		return
+	}
 	if req.URL.Path == "/login" {
 		r.serveLogin(w, req)
 		return
