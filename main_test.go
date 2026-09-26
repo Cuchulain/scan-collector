@@ -14,14 +14,14 @@ import (
 func TestPostWritesDailyCSV(t *testing.T) {
 	dir := t.TempDir()
 	handler := &receiver{dir: dir}
-	body := `{"timestamp":"2026-09-25T12:00:00Z","content":"9780306406157","format":"EAN-13","deviceId":"scanner-1"}`
+	body := `{"timestamp":"2026-09-25T12:00:00Z","content":"CODE-12345","format":"QR_CODE","deviceId":"scanner-1"}`
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body)))
 
 	if response.Code != http.StatusOK || response.Body.String() != "OK" {
 		t.Fatalf("unexpected response: %d %q", response.Code, response.Body.String())
 	}
-	path := filepath.Join(dir, "isbn-"+time.Now().Format("2006-01-02")+".csv")
+	path := filepath.Join(dir, "scan-"+time.Now().Format("2006-01-02")+".csv")
 	file, err := os.Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -31,7 +31,7 @@ func TestPostWritesDailyCSV(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 2 || rows[1][1] != "9780306406157" {
+	if len(rows) != 2 || rows[1][1] != "CODE-12345" {
 		t.Fatalf("unexpected CSV rows: %#v", rows)
 	}
 }
