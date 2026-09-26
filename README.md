@@ -6,6 +6,20 @@ Open `http://localhost:8765/` to view saved daily sets and their record counts. 
 
 The interface is available in Czech and English. It follows the browser's preferred language by default (Czech for Czech browser settings, English otherwise). Use the flag button to switch languages; the choice is remembered in that browser.
 
+## Screenshots
+
+### Sign in
+
+![Scan Collector sign-in screen in English](docs/screenshots/login.png)
+
+### Saved sets
+
+![Scan Collector saved sets overview in English](docs/screenshots/sets.png)
+
+### Scanned records
+
+![Scan Collector record details in English](docs/screenshots/records.png)
+
 ## Run locally
 
 Copy `.env.example` to `.env` next to `compose.yaml`, then set a username and a long, unique password:
