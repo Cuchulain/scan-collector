@@ -1,16 +1,15 @@
 # Scan Collector
 
-Small HTTP server for collecting scanned data from Android applications. It accepts JSON records with `timestamp`, `content`, `format`, and `deviceId` fields, then appends them to daily CSV files. The request shape is compatible with Binary Eye's HTTP POST integration.
+Small HTTP server primarily intended as a backend for the Android app [Binary Eye](https://github.com/markusfisch/BinaryEye). It accepts JSON records with `timestamp`, `content`, `format`, and `deviceId` fields, then appends them to daily CSV files. Other clients can use it too, as long as they send requests in the expected JSON format.
 
 Open `http://localhost:8765/` to view saved daily sets and their record counts. Each set has a detail page with per-record and bulk copy buttons, plus a CSV download.
 
 ## Run locally
 
-Create a `.env` file next to `compose.yaml` and set a username and a long, unique password:
+Copy `.env.example` to `.env` next to `compose.yaml`, then set a username and a long, unique password:
 
-```dotenv
-AUTH_USER=your-username
-AUTH_PASSWORD=replace-with-a-long-random-password
+```sh
+cp .env.example .env
 ```
 
 The server refuses to start if either value is missing. Keep `.env` private. HTTP Basic authentication protects the dashboard, detail pages, CSV downloads, and record submission. Use HTTPS through a reverse proxy before exposing the service beyond a trusted local network, because plain HTTP does not encrypt credentials or records.
@@ -18,7 +17,7 @@ The server refuses to start if either value is missing. Keep `.env` private. HTT
 Start the server:
 
 ```sh
-docker compose up --build -d
+docker compose up -d
 ```
 
 The server listens on port `8765`. CSV files are written to `./data/scan-YYYY-MM-DD.csv` and survive container recreation.
@@ -35,14 +34,14 @@ curl --user your-username -X POST http://localhost:8765/ \
 
 ## Pull the published image
 
-After the GitHub Actions workflow has published the image, set `IMAGE` to the GHCR image name:
+The Compose file uses the published image `ghcr.io/cuchulain/scan-collector:latest` by default. To use another tag, set `IMAGE`:
 
 ```sh
-IMAGE=ghcr.io/OWNER/REPOSITORY:latest docker compose up -d
+IMAGE=ghcr.io/cuchulain/scan-collector:latest docker compose up -d
 ```
 
 For a private package, authenticate Docker to `ghcr.io` with an account that has package read access before pulling.
 
 ## Publish
 
-Pushes to `main`, including merges into `main`, run tests and publish multi-platform `linux/amd64` and `linux/arm64` images to `ghcr.io/OWNER/REPOSITORY`, tagged `latest` and with the commit SHA. GitHub Actions uses the built-in `GITHUB_TOKEN`; ensure the repository permits Actions to write packages. The package visibility can be set to private in GitHub Packages.
+Pushes to `main`, including merges into `main`, run tests and publish multi-platform `linux/amd64` and `linux/arm64` images to `ghcr.io/cuchulain/scan-collector`, tagged `latest` and with the commit SHA. GitHub Actions uses the built-in `GITHUB_TOKEN`; ensure the repository permits Actions to write packages. The package visibility can be set to private in GitHub Packages.

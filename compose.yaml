@@ -2,8 +2,7 @@ name: scan-collector
 
 services:
   scan-collector:
-    image: ${IMAGE:-scan-collector:latest}
-    build: .
+    image: ${IMAGE:-ghcr.io/cuchulain/scan-collector:latest}
     environment:
       AUTH_USER: ${AUTH_USER:?Set AUTH_USER in .env}
       AUTH_PASSWORD: ${AUTH_PASSWORD:?Set AUTH_PASSWORD in .env}
