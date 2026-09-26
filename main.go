@@ -1,7 +1,7 @@
 package main
 
 import (
-	"crypto/subtle"
+	"database/sql"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -27,8 +27,14 @@ type entry struct {
 }
 
 type receiver struct {
-	dir string
-	mu  sync.Mutex
+	dir          string
+	mu           sync.Mutex
+	username     string
+	password     string
+	sessions     *sql.DB
+	sessionTTL   time.Duration
+	extendedTTL  time.Duration
+	secureCookie bool
 }
 
 type csvSet struct {
@@ -70,6 +76,7 @@ var pages = template.Must(template.New("pages").Parse(`<!doctype html>
   </style>
 </head>
 <body><main>
+  <div class="toolbar"><form action="/logout" method="post"><button class="secondary" type="submit">Odhlásit</button></form></div>
 {{if .Date}}
   <h1>Záznamy z {{.Date}}</h1>
   <p class="muted">Celkem {{.Total}} {{if eq .Total 1}}záznam{{else}}záznamů{{end}}</p>
@@ -99,40 +106,33 @@ var pages = template.Must(template.New("pages").Parse(`<!doctype html>
 {{end}}
 </main></body></html>`))
 
-func basicAuth(user, password string, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.Method == http.MethodPost && req.URL.Path == "/" {
-			next.ServeHTTP(w, req)
-			return
-		}
-
-		providedUser, providedPassword, ok := req.BasicAuth()
-		if user == "" || password == "" || !ok ||
-			subtle.ConstantTimeCompare([]byte(providedUser), []byte(user)) != 1 ||
-			subtle.ConstantTimeCompare([]byte(providedPassword), []byte(password)) != 1 {
-			w.Header().Set("WWW-Authenticate", `Basic realm="Scan Collector", charset="UTF-8"`)
-			http.Error(w, "authentication required", http.StatusUnauthorized)
-			return
-		}
-		next.ServeHTTP(w, req)
-	})
-}
-
 func (r *receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	if req.URL.Path == "/login" {
+		r.serveLogin(w, req)
+		return
+	}
+	if req.URL.Path == "/logout" {
+		r.serveLogout(w, req)
+		return
+	}
+	if req.Method == http.MethodPost && req.URL.Path == "/" {
+		r.servePost(w, req)
+		return
+	}
+	if !r.hasValidSession(req) {
+		http.Redirect(w, req, "/login", http.StatusSeeOther)
+		return
+	}
 	if req.Method == http.MethodGet {
 		r.serveGet(w, req)
 		return
 	}
-	if req.Method != http.MethodPost {
-		w.Header().Set("Allow", "GET, POST")
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	if req.URL.Path != "/" {
-		http.NotFound(w, req)
-		return
-	}
+	w.Header().Set("Allow", "GET")
+	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+}
 
+func (r *receiver) servePost(w http.ResponseWriter, req *http.Request) {
 	var item entry
 	decoder := json.NewDecoder(http.MaxBytesReader(w, req.Body, maxRequestBytes))
 	if err := decoder.Decode(&item); err != nil {
@@ -308,8 +308,25 @@ func main() {
 	if authUser == "" || authPassword == "" {
 		log.Fatal("AUTH_USER and AUTH_PASSWORD must be configured")
 	}
+	sessionTTL, err := parseSessionDuration("SESSION_TTL", "8h")
+	if err != nil {
+		log.Fatalf("invalid SESSION_TTL: %v", err)
+	}
+	extendedTTL, err := parseSessionDuration("SESSION_EXTENDED_TTL", "720h")
+	if err != nil {
+		log.Fatalf("invalid SESSION_EXTENDED_TTL: %v", err)
+	}
+	sessions, err := openSessionStore(dir)
+	if err != nil {
+		log.Fatalf("could not open session store: %v", err)
+	}
+	defer sessions.Close()
+	receiver := &receiver{
+		dir: dir, username: authUser, password: authPassword, sessions: sessions,
+		sessionTTL: sessionTTL, extendedTTL: extendedTTL,
+		secureCookie: strings.EqualFold(os.Getenv("COOKIE_SECURE"), "true"),
+	}
 	addr := fmt.Sprintf("0.0.0.0:%s", port)
 	log.Printf("Listening on %s; CSV files in %s", addr, dir)
-	handler := basicAuth(authUser, authPassword, &receiver{dir: dir})
-	log.Fatal(http.ListenAndServe(addr, handler))
+	log.Fatal(http.ListenAndServe(addr, receiver))
 }

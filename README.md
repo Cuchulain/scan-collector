@@ -12,7 +12,9 @@ Copy `.env.example` to `.env` next to `compose.yaml`, then set a username and a 
 cp .env.example .env
 ```
 
-The server refuses to start if either value is missing. Keep `.env` private. HTTP Basic authentication protects the dashboard, detail pages, and CSV downloads. Scan submissions to `POST /` do not require authentication so Binary Eye can send them. Use HTTPS through a reverse proxy before exposing the service beyond a trusted local network, because plain HTTP does not encrypt credentials or records.
+The server refuses to start if either value is missing. Keep `.env` private. A login screen protects the dashboard, detail pages, and CSV downloads. Scan submissions to `POST /` do not require authentication so Binary Eye can send them. Use HTTPS through a reverse proxy before exposing the service beyond a trusted local network, because plain HTTP does not encrypt credentials or records. Set `COOKIE_SECURE=true` when serving the site over HTTPS.
+
+`SESSION_TTL` sets the normal login duration (default `8h`). The login screen's extended-session checkbox uses `SESSION_EXTENDED_TTL` (default `720h`, or 30 days). Values use Go duration syntax such as `12h` or `336h`. Session records are stored in `./data/sessions.sqlite3` and survive container restarts; only a hash of each random session token is stored. The session cookie is HTTP-only and uses `SameSite=Lax`.
 
 Start the server:
 
