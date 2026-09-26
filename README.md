@@ -12,7 +12,7 @@ Copy `.env.example` to `.env` next to `compose.yaml`, then set a username and a 
 cp .env.example .env
 ```
 
-The server refuses to start if either value is missing. Keep `.env` private. HTTP Basic authentication protects the dashboard, detail pages, CSV downloads, and record submission. Use HTTPS through a reverse proxy before exposing the service beyond a trusted local network, because plain HTTP does not encrypt credentials or records.
+The server refuses to start if either value is missing. Keep `.env` private. HTTP Basic authentication protects the dashboard, detail pages, and CSV downloads. Scan submissions to `POST /` do not require authentication so Binary Eye can send them. Use HTTPS through a reverse proxy before exposing the service beyond a trusted local network, because plain HTTP does not encrypt credentials or records.
 
 Start the server:
 
@@ -25,12 +25,12 @@ The server listens on port `8765`. CSV files are written to `./data/scan-YYYY-MM
 Send a record with:
 
 ```sh
-curl --user your-username -X POST http://localhost:8765/ \
+curl -X POST http://localhost:8765/ \
   -H 'Content-Type: application/json' \
   -d '{"timestamp":"2026-09-25T12:00:00Z","content":"sample scanned data","format":"QR_CODE","deviceId":"scanner-1"}'
 ```
 
-`curl` prompts for the password. Set `PORT` to change the host port. The container writes inside `/data`, mapped to `./data` by Compose. CSV columns are `čas,obsah,formát,zařízení`.
+Set `PORT` to change the host port. The container writes inside `/data`, mapped to `./data` by Compose. CSV columns are `čas,obsah,formát,zařízení`.
 
 ## Pull the published image
 

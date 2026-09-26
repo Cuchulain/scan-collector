@@ -101,6 +101,11 @@ var pages = template.Must(template.New("pages").Parse(`<!doctype html>
 
 func basicAuth(user, password string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.Method == http.MethodPost && req.URL.Path == "/" {
+			next.ServeHTTP(w, req)
+			return
+		}
+
 		providedUser, providedPassword, ok := req.BasicAuth()
 		if user == "" || password == "" || !ok ||
 			subtle.ConstantTimeCompare([]byte(providedUser), []byte(user)) != 1 ||
