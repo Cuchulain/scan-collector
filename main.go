@@ -275,6 +275,9 @@ func (r *receiver) listSets() ([]csvSet, error) {
 		if count > 0 {
 			count-- // header row
 		}
+		if count == 0 {
+			continue
+		}
 		sets = append(sets, csvSet{Date: date, Count: count})
 	}
 	sort.Slice(sets, func(i, j int) bool { return sets[i].Date > sets[j].Date })
